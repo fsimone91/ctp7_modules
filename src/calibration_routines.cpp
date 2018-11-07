@@ -1374,7 +1374,7 @@ std::vector<uint32_t> dacScanLocal(localArgs *la, uint32_t ohN, uint32_t dacSele
     //map_dacSelect[1] = std::make_tuple("CFG_", 0,);
     map_dacSelect[2] = std::make_tuple("CFG_BIAS_PRE_I_BIT", 0, 0xff);
     map_dacSelect[3] = std::make_tuple("CFG_BIAS_PRE_I_BLCC", 0, 0x3f);
-    //map_dacSelect[4] = std::make_tuple("CFG_", 0,);
+    map_dacSelect[4] = std::make_tuple("CFG_BIAS_PRE_I_BSF", 0,0x3f);
     map_dacSelect[5] = std::make_tuple("CFG_BIAS_SH_I_BFCAS", 0, 0xff);
     map_dacSelect[6] = std::make_tuple("CFG_BIAS_SH_I_BDIFF", 0, 0xff);
     map_dacSelect[7] = std::make_tuple("CFG_BIAS_SD_I_BDIFF", 0, 0xff);
@@ -1383,10 +1383,12 @@ std::vector<uint32_t> dacScanLocal(localArgs *la, uint32_t ohN, uint32_t dacSele
     map_dacSelect[10] = std::make_tuple("CFG_BIAS_CFD_DAC_1", 0, 0x3f);
     map_dacSelect[11] = std::make_tuple("CFG_BIAS_CFD_DAC_2", 0, 0x3f);
     map_dacSelect[12] = std::make_tuple("CFG_HYST", 0, 0x3f);
-    //map_dacSelect[13] = std::make_tuple("CFG_", 0,);
+    //map_dacSelect[13] = std::make_tuple("NOREG_CFGIREFLOCAL", 0, 0); //CFD Ireflocal
     map_dacSelect[14] = std::make_tuple("CFG_THR_ARM_DAC", 0, 0xff);
     map_dacSelect[15] = std::make_tuple("CFG_THR_ZCC_DAC", 0, 0xff);
     //map_dacSelect[16] = std::make_tuple("CFG_", 0,);
+    //map_dacSelect[32] = std::make_tuple("NOREG_BGR", 0,); //Band gap reference
+    //map_dacSelect[40] = std::make_tuple("NOREG_ADCVinM", 0,); //ADC Vin M
 
     //ADC Measures Voltage
     //map_dacSelect[32] = std::make_tuple("CFG_", 0,);
@@ -1458,7 +1460,8 @@ std::vector<uint32_t> dacScanLocal(localArgs *la, uint32_t ohN, uint32_t dacSele
     std::this_thread::sleep_for(std::chrono::seconds(1)); //I noticed that DAC values behave weirdly immediately after VFAT is placed in run mode (probably voltage/current takes a moment to stabalize)
 
     //Scan the DAC
-    uint32_t adcVal;
+    uint32_t adcVal=0;
+    uint32_t Temp;
     for(uint32_t dacVal=dacMin; dacVal<=dacMax; dacVal += dacStep){ //Loop over DAC values
         for(int vfatN=0; vfatN<24; ++vfatN){ //Loop over VFATs
             //Skip masked VFATs
@@ -1475,15 +1478,19 @@ std::vector<uint32_t> dacScanLocal(localArgs *la, uint32_t ohN, uint32_t dacSele
                 std::string strDacReg = stdsprintf("GEM_AMC.OH.OH%i.GEB.VFAT%i.",ohN,vfatN) + regName;
                 writeReg(la, strDacReg, dacVal);
 
-                //Read the ADC
-                adcVal = readRawAddress(adcAddr[vfatN], la->response);
-
+    		for(int i=0; i<100; ++i){ //Read 100 times and take avg value
+                    //Read the ADC
+                    Temp = readRawAddress(adcAddr[vfatN], la->response);
+		            adcVal = adcVal + Temp;
+		}
+		adcVal = adcVal/100;
                 //Store value
                 int idx = vfatN*(dacMax-dacMin+1)/dacStep+(dacVal-dacMin)/dacStep;
                 vec_dacScanData[idx] = ((ohN & 0xf) << 23) + ((vfatN & 0x1f) << 18) + ((adcVal & 0x3ff) << 8) + (dacVal & 0xff);
             } //End Case: VFAT is not masked
         } //End Loop over VFATs
     } //End Loop over DAC values
+
 
     //Take the VFATs out of Run Mode
     broadcastWriteLocal(la, ohN, "CFG_RUN", 0x0, mask);
