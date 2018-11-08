@@ -1478,7 +1478,7 @@ std::vector<uint32_t> dacScanLocal(localArgs *la, uint32_t ohN, uint32_t dacSele
                 std::string strDacReg = stdsprintf("GEM_AMC.OH.OH%i.GEB.VFAT%i.",ohN,vfatN) + regName;
                 writeReg(la, strDacReg, dacVal);
                 for(int i=0; i<100; ++i){ //Read 100 times and take avg value
-                //Read the ADC
+                    //Read the ADC
                     Temp = readRawAddress(adcAddr[vfatN], la->response);
                     adcVal = adcVal + Temp;
                 }
